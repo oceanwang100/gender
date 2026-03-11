@@ -1,7 +1,7 @@
-const DATA_KEYS = {
-    QUESTIONS: 'geg_v2_questions',
-    RESULTS: 'geg_v2_results'
-};
+// ============================================================
+// data.js — Firebase Realtime Database 版本
+// 所有題目與成績統一存在雲端，各裝置共用同一份資料
+// ============================================================
 
 const DEFAULT_QUESTIONS = [
     { text: "「抱持不同性別者應能享有平等權利之理念」是性別差異與尊重同理中的積極適應性作為。", answer: "O", explanation: "正確！這展現了對性別平等的尊重與理解。" },
@@ -17,34 +17,49 @@ const DEFAULT_QUESTIONS = [
 ];
 
 const DataManager = {
-    init: function() {
-        if (!localStorage.getItem(DATA_KEYS.QUESTIONS)) {
-            localStorage.setItem(DATA_KEYS.QUESTIONS, JSON.stringify(DEFAULT_QUESTIONS));
+    /**
+     * 取得題目（從 Firebase）
+     * 若 Firebase 中尚無題目，則自動寫入預設題目
+     * @returns {Promise<Array>}
+     */
+    getQuestions: async function () {
+        const snapshot = await db.ref('questions').once('value');
+        const val = snapshot.val();
+        if (!val) {
+            // 首次使用，將預設題目寫入 Firebase
+            await db.ref('questions').set(DEFAULT_QUESTIONS);
+            return DEFAULT_QUESTIONS;
         }
-        if (!localStorage.getItem(DATA_KEYS.RESULTS)) {
-            localStorage.setItem(DATA_KEYS.RESULTS, JSON.stringify([]));
-        }
+        // Firebase 陣列可能以物件形式回傳，轉為陣列
+        return Array.isArray(val) ? val : Object.values(val);
     },
 
-    getQuestions: function() {
-        this.init();
-        return JSON.parse(localStorage.getItem(DATA_KEYS.QUESTIONS));
+    /**
+     * 儲存題目陣列至 Firebase
+     * @param {Array} questions
+     */
+    saveQuestions: async function (questions) {
+        await db.ref('questions').set(questions);
     },
 
-    saveQuestions: function(questions) {
-        localStorage.setItem(DATA_KEYS.QUESTIONS, JSON.stringify(questions));
+    /**
+     * 取得所有成績（從 Firebase）
+     * @returns {Promise<Array>}
+     */
+    getResults: async function () {
+        const snapshot = await db.ref('results').once('value');
+        const val = snapshot.val();
+        if (!val) return [];
+        // Firebase push() 會產生物件形式，轉換為陣列並附上 key
+        return Object.entries(val).map(([key, data]) => ({ _key: key, ...data }));
     },
 
-    getResults: function() {
-        this.init();
-        return JSON.parse(localStorage.getItem(DATA_KEYS.RESULTS));
-    },
-
-    saveResult: function(userResult) {
-        const results = this.getResults();
+    /**
+     * 儲存單筆成績至 Firebase（使用 push 確保不覆蓋他人紀錄）
+     * @param {{ name: string, id: string, score: number }} userResult
+     */
+    saveResult: async function (userResult) {
         userResult.timestamp = new Date().toISOString();
-        results.push(userResult);
-        localStorage.setItem(DATA_KEYS.RESULTS, JSON.stringify(results));
+        await db.ref('results').push(userResult);
     }
 };
-DataManager.init();

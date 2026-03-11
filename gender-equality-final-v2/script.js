@@ -50,7 +50,7 @@ function showScreen(key) {
     screens[key].classList.add('active');
 }
 
-function initGame() {
+async function initGame() {
     const name = document.getElementById('user-name').value.trim();
     const id = document.getElementById('user-id').value.trim();
     if (!name || !id) {
@@ -59,9 +59,24 @@ function initGame() {
     }
     currentUser = { name, id };
 
-    // Shuffle and pick 10
-    const allQ = DataManager.getQuestions();
-    questions = allQ.sort(() => Math.random() - 0.5).slice(0, 10);
+    // 顯示讀取中提示
+    const startBtn = document.getElementById('start-btn');
+    startBtn.disabled = true;
+    startBtn.textContent = '題目載入中…';
+
+    try {
+        // 從 Firebase 取得題目
+        const allQ = await DataManager.getQuestions();
+        questions = allQ.sort(() => Math.random() - 0.5).slice(0, 10);
+    } catch (e) {
+        alert('網路廣異常，無法載入題目，請重試。');
+        startBtn.disabled = false;
+        startBtn.textContent = '開始挑戰';
+        return;
+    }
+
+    startBtn.disabled = false;
+    startBtn.textContent = '開始挑戰';
 
     currentIdx = 0;
     userScore = 0;
@@ -106,14 +121,18 @@ function nextQuestion() {
     }
 }
 
-function finishGame() {
+async function finishGame() {
     progressBar.style.width = '100%';
     document.getElementById('final-score').textContent = userScore;
-    DataManager.saveResult({
-        name: currentUser.name,
-        id: currentUser.id,
-        score: userScore
-    });
+    try {
+        await DataManager.saveResult({
+            name: currentUser.name,
+            id: currentUser.id,
+            score: userScore
+        });
+    } catch (e) {
+        console.warn('成績上傳失敗（可能是離線狀態）：', e);
+    }
     showScreen('result');
 }
 
@@ -198,7 +217,7 @@ async function saveImage() {
         link.click();
         showToast('✅ 獎狀圖片已儲存！');
     } catch (e) {
-        alert('圖片别存失敗，請重試。');
+        alert('圖片別存失敗，請重試。');
     } finally {
         certArea.style.display = 'none';
         btn.disabled = false;
@@ -216,7 +235,6 @@ function shareToLine() {
 }
 
 function shareToFacebook() {
-    // 本地檔案 Facebook 無法分享 URL，改為將分享文字複製到剩貼簿是提
     const text = getShareText();
     navigator.clipboard.writeText(text).then(() => {
         showToast('✅ 分享文字已複製！請貼到 Facebook');
