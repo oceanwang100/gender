@@ -1,6 +1,6 @@
 // ============================================================
-// data.js — Firebase Realtime Database 版本
-// 所有題目與成績統一存在雲端，各裝置共用同一份資料
+// data.js — Firebase Realtime Database 版本（含 fallback 機制）
+// 若 Firebase 連線失敗，自動改用內建預設題目繼續遊戲
 // ============================================================
 
 const DEFAULT_QUESTIONS = [
@@ -16,22 +16,61 @@ const DEFAULT_QUESTIONS = [
     { text: "在家庭中對孩子進行性教育時為免尷尬，溝通時盡量避免面對面。", answer: "X", explanation: "錯誤。真誠、自然的「面對面」溝通能讓孩子感受到父母的關心與開放態度。" }
 ];
 
+// Firebase 是否可用
+let firebaseAvailable = false;
+
+// 測試 Firebase 連線是否正常（最多等 5 秒）
+function testFirebaseConnection() {
+    return new Promise((resolve) => {
+        if (typeof firebase === 'undefined' || typeof db === 'undefined') {
+            resolve(false);
+            return;
+        }
+        const timeout = setTimeout(() => resolve(false), 5000);
+        db.ref('.info/connected').once('value')
+            .then((snap) => {
+                clearTimeout(timeout);
+                resolve(snap.val() === true);
+            })
+            .catch(() => {
+                clearTimeout(timeout);
+                resolve(false);
+            });
+    });
+}
+
 const DataManager = {
     /**
-     * 取得題目（從 Firebase）
-     * 若 Firebase 中尚無題目，則自動寫入預設題目
+     * 初始化：測試 Firebase 連線
+     */
+    init: async function () {
+        firebaseAvailable = await testFirebaseConnection();
+        if (!firebaseAvailable) {
+            console.warn('[DataManager] Firebase 連線失敗，將使用本地模式（成績無法儲存至雲端）');
+        }
+        return firebaseAvailable;
+    },
+
+    /**
+     * 取得題目
+     * Firebase 可用時從雲端取；否則使用預設題目
      * @returns {Promise<Array>}
      */
     getQuestions: async function () {
-        const snapshot = await db.ref('questions').once('value');
-        const val = snapshot.val();
-        if (!val) {
-            // 首次使用，將預設題目寫入 Firebase
-            await db.ref('questions').set(DEFAULT_QUESTIONS);
+        if (!firebaseAvailable) return DEFAULT_QUESTIONS;
+        try {
+            const snapshot = await db.ref('questions').once('value');
+            const val = snapshot.val();
+            if (!val) {
+                // 首次使用，將預設題目寫入 Firebase
+                await db.ref('questions').set(DEFAULT_QUESTIONS);
+                return DEFAULT_QUESTIONS;
+            }
+            return Array.isArray(val) ? val : Object.values(val);
+        } catch (e) {
+            console.warn('[DataManager] 讀取題目失敗，改用預設題目:', e);
             return DEFAULT_QUESTIONS;
         }
-        // Firebase 陣列可能以物件形式回傳，轉為陣列
-        return Array.isArray(val) ? val : Object.values(val);
     },
 
     /**
@@ -39,6 +78,7 @@ const DataManager = {
      * @param {Array} questions
      */
     saveQuestions: async function (questions) {
+        if (!firebaseAvailable) throw new Error('Firebase 未連線');
         await db.ref('questions').set(questions);
     },
 
@@ -47,19 +87,32 @@ const DataManager = {
      * @returns {Promise<Array>}
      */
     getResults: async function () {
-        const snapshot = await db.ref('results').once('value');
-        const val = snapshot.val();
-        if (!val) return [];
-        // Firebase push() 會產生物件形式，轉換為陣列並附上 key
-        return Object.entries(val).map(([key, data]) => ({ _key: key, ...data }));
+        if (!firebaseAvailable) return [];
+        try {
+            const snapshot = await db.ref('results').once('value');
+            const val = snapshot.val();
+            if (!val) return [];
+            return Object.entries(val).map(([key, data]) => ({ _key: key, ...data }));
+        } catch (e) {
+            console.warn('[DataManager] 讀取成績失敗:', e);
+            return [];
+        }
     },
 
     /**
-     * 儲存單筆成績至 Firebase（使用 push 確保不覆蓋他人紀錄）
+     * 儲存單筆成績至 Firebase
      * @param {{ name: string, id: string, score: number }} userResult
      */
     saveResult: async function (userResult) {
-        userResult.timestamp = new Date().toISOString();
-        await db.ref('results').push(userResult);
+        if (!firebaseAvailable) {
+            console.warn('[DataManager] Firebase 未連線，成績無法上傳');
+            return;
+        }
+        try {
+            userResult.timestamp = new Date().toISOString();
+            await db.ref('results').push(userResult);
+        } catch (e) {
+            console.warn('[DataManager] 成績上傳失敗:', e);
+        }
     }
 };

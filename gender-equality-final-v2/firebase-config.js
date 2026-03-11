@@ -4,9 +4,7 @@
 const firebaseConfig = {
     apiKey: "AIzaSyBrQ8EZuYC62pAwNA5JUdOvVlmTaPy_ARo",
     authDomain: "gender-equality-game.firebaseapp.com",
-    // 注意：databaseURL 格式為 https://<projectId>-default-rtdb.firebaseio.com
-    // 若資料庫建立於亞洲區，請至 Firebase Console > Realtime Database 查看正確 URL
-    databaseURL: "https://gender-equality-game-default-rtdb.firebaseio.com",
+    databaseURL: "https://gender-equality-game-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "gender-equality-game",
     storageBucket: "gender-equality-game.firebasestorage.app",
     messagingSenderId: "407617077929",

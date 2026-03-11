@@ -64,16 +64,12 @@ async function initGame() {
     startBtn.disabled = true;
     startBtn.textContent = '題目載入中…';
 
-    try {
-        // 從 Firebase 取得題目
-        const allQ = await DataManager.getQuestions();
-        questions = allQ.sort(() => Math.random() - 0.5).slice(0, 10);
-    } catch (e) {
-        alert('網路廣異常，無法載入題目，請重試。');
-        startBtn.disabled = false;
-        startBtn.textContent = '開始挑戰';
-        return;
-    }
+    // 初始化 Firebase 連線偵測（含 fallback）
+    await DataManager.init();
+
+    // 取得題目（Firebase 可用時從雲端取，否則用內建題目）
+    const allQ = await DataManager.getQuestions();
+    questions = allQ.sort(() => Math.random() - 0.5).slice(0, 10);
 
     startBtn.disabled = false;
     startBtn.textContent = '開始挑戰';
