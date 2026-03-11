@@ -151,6 +151,11 @@ document.getElementById('cancel-edit').addEventListener('click', resetForm);
 
 // ---------- 初始化 ----------
 async function initAdmin() {
+    // 必須先初始化 Firebase 連線，否則所有讀寫都會失敗
+    const connected = await DataManager.init();
+    if (!connected) {
+        console.error('[Admin] Firebase 連線失敗，請確認 databaseURL 設定是否正確');
+    }
     await renderResults();
     await renderQuestions();
 }
