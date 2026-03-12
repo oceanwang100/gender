@@ -222,7 +222,7 @@ async function saveImage() {
 }
 
 function getShareText() {
-    return `我完成了「性別平等小學堂」闖關遊戲，獲得 ${userScore} 分！🌸 一起來挑戰看看吧！<a href="https://reurl.cc/Z27b0V" target="_blank">https://reurl.cc/Z27b0V</a>`;
+    return `我完成了「性別平等小學堂」闖關遊戲，獲得 ${userScore} 分！🌸 一起來挑戰看看吧！https://reurl.cc/Z27b0V`;
 }
 
 function shareToLine() {
@@ -307,4 +307,5 @@ if (navigator.share) {
     nativeBtn.style.display = 'inline-flex';
     nativeBtn.addEventListener('click', nativeShare);
 }
+
 
